@@ -1,104 +1,58 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import axios from "axios";
 import React from "react";
 import { v4 as uuidv4 } from "uuid";
 
-// action items
-// const ADD_TODO = "ADD_TODO";
-// const REMOVE_TODO = "REMOVE_TODO";
-// const SWITCH_TODO = "SWITCH_TODO";
+const initialState = {
+	todos: [
+		{
+			id: uuidv4(),
+			title: "리액트 공부하기",
+			contents: "빨리빨리 암기하기",
+			isDone: false,
+		},
+		{
+			id: uuidv4(),
+			title: "스프링 공부하기",
+			contents: "인강 열심히 들어보기!!",
+			isDone: true,
+		},
+		{
+			id: uuidv4(),
+			title: "데이트",
+			contents: "홍대입구역에서 3시까지",
+			isDone: false,
+		},
+	],
+	isLoading: false,
+	isError: false,
+	error: null,
+};
 
-/**
- * 메서드 개요 : todo 객체를 입력받아, 기존 todolist에 더함
- * 2022.12.16 : 최초작성
- *
- * @param {todo 객체} payload
- * @returns
- */
-// export const addTodo = (payload) => {
-// 	// action creator 들을 내보냈었음 (아래 remove, switch 등도)
-// 	return {
-// 		type: ADD_TODO, // type과 payload를 가진 action객체를 만들었었다
-// 		payload,
-// 	};
-// };
+// Thunk
+export const __getTodos = createAsyncThunk(
+	// 두 개의 인자
+	"getTodos", // 1. 문자열 이름
+	async (payload, thunkAPI) => {
+		// 2. 함수
+		// thunk함수-서버랑 통신하기 때문에 반드시 비동기함수여야
+		// 서버 통신 항상 성공 x -> try, catch로 묶어주기
+		try {
+			const response = await axios.get("http://localhost:4001/todos");
+			console.log("response", response.data);
 
-/**
- * 메서드 개요 : todo의 id를 입력받아, 일치하는 todolist를 삭제
- * 2022.12.16 : 최초작성
- *
- * @param {todo의 id} payload
- * @returns
- */
-// export const removeTodo = (payload) => {
-// 	return {
-// 		type: REMOVE_TODO,
-// 		payload,
-// 	};
-// };
+			// toolkit에서 제공하는 API
+			// Promise -> resolve되니 경우(=네트워크 요청이 성공한 경우)에 dispatch해주는 기능 (이 기능이 끝나고나서 리듀서로 보내주는)을 가진 API
+			// (dispatch란 리듀서에게 action / type,payload 전달하는 거)
+			return thunkAPI.fulfillWithValue(response.data); // 의미있는 data 부분만 store로 넘겨주면됨 / response.data가 action.payload로 넘어가 // 꼭 리턴해주기 -> 그래야 extraReducer로넘어가
+		} catch (error) {
+			console.log("error", error);
 
-/**
- * 메서드 개요 : todo의 id를 입력받아, 일치하는 todo 아이템의 isDone을 반대로 변경
- * 2022.12.16 : 최초작성
- *
- * @param {*} payload
- * @returns
- */
-// export const switchTodo = (payload) => {
-// 	return {
-// 		type: SWITCH_TODO,
-// 		payload,
-// 	};
-// };
-
-// initial states
-const initialState = [
-	{
-		id: uuidv4(),
-		title: "리액트 공부하기",
-		contents: "빨리빨리 암기하기",
-		isDone: false,
-	},
-	{
-		id: uuidv4(),
-		title: "스프링 공부하기",
-		contents: "인강 열심히 들어보기!!",
-		isDone: true,
-	},
-	{
-		id: uuidv4(),
-		title: "데이트",
-		contents: "홍대입구역에서 3시까지",
-		isDone: false,
-	},
-];
-
-// reducers
-// const todos = (state = initialState, action) => {
-// 	switch (action.type) {
-// 		case ADD_TODO: // 기존의 배열에 입력받은 객체를 더함
-// 			return [...state, action.payload];
-// 		case REMOVE_TODO: // 기존의 배열에서 입력받은 id의 객체를 제거(filter)
-// 			return state.filter((item) => item.id !== action.payload);
-// 		case SWITCH_TODO: // 기존의 배열에서 입력받은 id에 해당하는 것만 isDone을 반대로 변경(아니면 그대로 반환)
-// 			return state.map((item) => {
-// 				if (item.id === action.payload) {
-// 					return { ...item, isDone: !item.isDone };
-// 				} else {
-// 					return item;
-// 				}
-// 			});
-// 		default:
-// 			return state;
-// 	}
-// };
-
-// export
-// export default todos;
-
-// 기존 redux
-// 1. export action creator
-// 2. export reducer
-// 3. action value (를 정의)
+			// toolkit에서 제공하는 API
+			return thunkAPI.rejectWithValue(error); // 에러시 이 error객체가 action.payload로 넘어가 // 꼭 리턴해주기
+		}
+	}
+);
 
 // -> redux toolkit에서는 [slice] - action cretar, reducers 등 한번에 만들기 !! 아래에
 const todosSlice = createSlice({
@@ -121,9 +75,28 @@ const todosSlice = createSlice({
 			});
 		},
 	},
+	extraReducers: {
+		[__getTodos.pending]: (state, action) => {
+			// 아직 진행 중일 때
+			state.isLoading = true;
+			state.isError = false; // 아직 에러인 지 모르는 상태니까
+		},
+		[__getTodos.fulfilled]: (state, action) => {
+			// 이행된 경우
+			console.log("fulfilled : ", action); // action객체 안에 type, payload 확인가능
+			state.isLoading = false;
+			state.isError = false;
+			state = action.payload; // 서버부터 받은 값 넣어주기
+		},
+		[__getTodos.rejected]: (state, action) => {
+			// 실패한 경우
+			state.isLoading = false; // 실패한 경우도 isLoading상태는 아니니까
+			state.isError = true;
+			state.error = action.payload;
+		},
+	},
 });
 
-// action creator로서 내보낼 수 있다
 export const { addTodo, removeTodo, switchTodo } = todosSlice.actions;
-// reducer도 내보내기
+export const {} = todosSlice.actions;
 export default todosSlice.reducer;
